@@ -26,10 +26,29 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks | grep -i watch || true
 
+      - name: Converter projeto para o formato do Xcode 26
+        run: |
+          cat > /tmp/downgrade.py <<'PYEOF'
+          import re,sys
+          p=sys.argv[1]; s=open(p).read()
+          s=s.replace('objectVersion = 110;','objectVersion = 77;').replace('preferredProjectObjectVersion = 110;','preferredProjectObjectVersion = 77;')
+          s=re.sub(r'(\n(\t+))dstSubfolder = Product;', r'\1dstSubfolderSpec = 16;', s)
+          def fix(m):
+              block=m.group(0)
+              ind=re.search(r'\n(\t+)isa = ',block).group(1)
+              if 'buildActionMask' not in block:
+                  block=block.replace(f'\n{ind}isa = {m.group(1)};', f'\n{ind}isa = {m.group(1)};\n{ind}buildActionMask = 2147483647;',1)
+              if 'runOnlyForDeploymentPostprocessing' not in block:
+                  block=re.sub(r'\n(\t+)\};$', lambda mm: f'\n{ind}runOnlyForDeploymentPostprocessing = 0;\n{mm.group(1)}}};', block, count=1)
+              return block
+          s=re.sub(r'\n\t\t[0-9A-F]{24} /\* [^*]+ \*/ = \{\n\t\t\tisa = (PBX(?:Frameworks|Resources|Sources|CopyFiles|ShellScript)BuildPhase);.*?\n\t\t\};', fix, s, flags=re.S)
+          open(p,'w').write(s)
+          print('objectVersion ok' if 'objectVersion = 77;' in s else 'FALHOU')
+          PYEOF
+          python3 /tmp/downgrade.py Clocky.xcodeproj/project.pbxproj
+
       - name: Incluir arm64_32 no app do Watch (relógios até Series 8 / SE)
         run: |
-          # Troca a lista de arquiteturas do target do Watch por arm64 + arm64_32.
-          # arm64 cobre Series 9+ / Ultra 2+; arm64_32 cobre Series 4–8 e SE.
           perl -0pi -e 's/"ARCHS\[sdk=watchos\*\]" = \(\s*arm64,\s*arm64e,\s*arm64e\.x1,\s*\);/"ARCHS[sdk=watchos*]" = (\n\t\t\t\t\tarm64,\n\t\t\t\t\tarm64_32,\n\t\t\t\t);/g' Clocky.xcodeproj/project.pbxproj
           grep -A4 'ARCHS\[sdk=watchos' Clocky.xcodeproj/project.pbxproj
           grep -q arm64_32 Clocky.xcodeproj/project.pbxproj
