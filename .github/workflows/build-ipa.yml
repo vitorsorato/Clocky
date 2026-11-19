@@ -52,7 +52,11 @@ jobs:
           perl -0pi -e 's/"ARCHS\[sdk=watchos\*\]" = \(\s*arm64,\s*arm64e,\s*arm64e\.x1,\s*\);/"ARCHS[sdk=watchos*]" = (\n\t\t\t\t\tarm64,\n\t\t\t\t\tarm64_32,\n\t\t\t\t);/g' Clocky.xcodeproj/project.pbxproj
           grep -A4 'ARCHS\[sdk=watchos' Clocky.xcodeproj/project.pbxproj
           grep -q arm64_32 Clocky.xcodeproj/project.pbxproj
-
+      - name: Remover arquitetura arm64e.x1 dos .tbd (Xcode 26 não conhece)
+        run: |
+          find . -name "*.tbd" -exec perl -pi -e 's/,\s*arm64e\.x1-watchos//g; s/arm64e\.x1-watchos,\s*//g' {} +
+          ! grep -rl "arm64e.x1" --include=*.tbd .
+          
       - name: Gerar IPA sem assinatura
         run: |
           BID="${{ github.event.inputs.bundle_id }}"
