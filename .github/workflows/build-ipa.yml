@@ -1,0 +1,53 @@
+name: Build unsigned IPA (arm64 + arm64_32)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bundle_id:
+        description: "Bundle ID do app do iPhone (o do Watch vira <id>.watchkitapp)"
+        required: false
+        default: "com.example.Clocky"
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Selecionar o Xcode mais novo disponível
+        run: |
+          ls -d /Applications/Xcode*.app
+          XC="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          echo "Usando $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i watch || true
+
+      - name: Incluir arm64_32 no app do Watch (relógios até Series 8 / SE)
+        run: |
+          # Troca a lista de arquiteturas do target do Watch por arm64 + arm64_32.
+          # arm64 cobre Series 9+ / Ultra 2+; arm64_32 cobre Series 4–8 e SE.
+          perl -0pi -e 's/"ARCHS\[sdk=watchos\*\]" = \(\s*arm64,\s*arm64e,\s*arm64e\.x1,\s*\);/"ARCHS[sdk=watchos*]" = (\n\t\t\t\t\tarm64,\n\t\t\t\t\tarm64_32,\n\t\t\t\t);/g' Clocky.xcodeproj/project.pbxproj
+          grep -A4 'ARCHS\[sdk=watchos' Clocky.xcodeproj/project.pbxproj
+          grep -q arm64_32 Clocky.xcodeproj/project.pbxproj
+
+      - name: Gerar IPA sem assinatura
+        run: |
+          BID="${{ github.event.inputs.bundle_id }}"
+          [ -n "$BID" ] || BID="com.example.Clocky"
+          bash scripts/create_ipa.sh --bundle-id "$BID" --output build/ipa/Clocky.ipa
+
+      - name: Conferir arquiteturas do binário do Watch
+        run: |
+          cd build/ipa && rm -rf x && mkdir x && cd x && unzip -q ../Clocky.ipa
+          W="$(ls -d Payload/*.app/Watch/*.app)"
+          lipo -info "$W/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$W/Info.plist")"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Clocky-ipa
+          path: build/ipa/Clocky.ipa
+          if-no-files-found: error
