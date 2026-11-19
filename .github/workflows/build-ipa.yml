@@ -47,11 +47,14 @@ jobs:
           PYEOF
           python3 /tmp/downgrade.py Clocky.xcodeproj/project.pbxproj
 
-      - name: Incluir arm64_32 no app do Watch (relógios até Series 8 / SE)
+      - name: Arquiteturas do Watch = arm64 + arm64_32 (Xcode 26 não conhece arm64e.x1)
         run: |
-          perl -0pi -e 's/"ARCHS\[sdk=watchos\*\]" = \(\s*arm64,\s*arm64e,\s*arm64e\.x1,\s*\);/"ARCHS[sdk=watchos*]" = (\n\t\t\t\t\tarm64,\n\t\t\t\t\tarm64_32,\n\t\t\t\t);/g' Clocky.xcodeproj/project.pbxproj
+          # Substitui qualquer lista ARCHS[sdk=watchos*] por arm64 + arm64_32.
+          # arm64 cobre Series 9+ / Ultra 2+; arm64_32 cobre Series 4–8 e SE.
+          perl -0pi -e 's/"ARCHS\[sdk=watchos\*\]" = \([^)]*\);/"ARCHS[sdk=watchos*]" = (\n\t\t\t\t\tarm64,\n\t\t\t\t\tarm64_32,\n\t\t\t\t);/g' Clocky.xcodeproj/project.pbxproj
           grep -A4 'ARCHS\[sdk=watchos' Clocky.xcodeproj/project.pbxproj
-          grep -q arm64_32 Clocky.xcodeproj/project.pbxproj
+          ! grep -q 'arm64e' Clocky.xcodeproj/project.pbxproj
+
       - name: Remover arquitetura arm64e.x1 dos .tbd (Xcode 26 não conhece)
         run: |
           find . -name "*.tbd" -exec perl -pi -e 's/,\s*arm64e\.x1-watchos//g; s/arm64e\.x1-watchos,\s*//g' {} +
