@@ -306,6 +306,7 @@
 			buildSettings = {
 				"ARCHS[sdk=watchos*]" = (
 					arm64,
+					arm64_32,
 					arm64e,
 					arm64e.x1,
 				);
@@ -506,6 +507,7 @@
 			buildSettings = {
 				"ARCHS[sdk=watchos*]" = (
 					arm64,
+					arm64_32,
 					arm64e,
 					arm64e.x1,
 				);
